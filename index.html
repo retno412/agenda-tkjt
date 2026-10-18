@@ -123,6 +123,30 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- TABEL DAFTAR SISWA (DRILL-DOWN) -->
+                <div id="studentListSection" class="mt-8 hidden animate-fade-in">
+                    <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                        <i class="fa-solid fa-users mr-2 text-blue-600"></i> Detail Siswa: <span id="lblDetailKelas" class="ml-1 text-blue-600"></span>
+                    </h3>
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-50 border-b border-slate-200 text-sm text-slate-600">
+                                        <th class="p-4 font-semibold w-16 text-center">No</th>
+                                        <th class="p-4 font-semibold">Nama Siswa</th>
+                                        <th class="p-4 font-semibold text-center w-32">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbodyDashboardSiswa" class="text-sm divide-y divide-slate-100">
+                                    <!-- Render Dinamis dari JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
             <!-- Loading State Animasi (Muncul saat mengambil metrik) -->
@@ -311,6 +335,31 @@
         </section>
 
     </main>
+
+    <!-- MODAL RIWAYAT SISWA & INPUT SUSULAN -->
+    <div id="modalHistory" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-900 bg-opacity-50 p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-fade-in">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                <h3 class="text-lg font-bold text-slate-800">
+                    <i class="fa-solid fa-user-graduate text-blue-600 mr-2"></i> Riwayat: <span id="modalStudentName" class="text-blue-700"></span>
+                </h3>
+                <button id="btnCloseModal" class="text-slate-400 hover:text-red-500 transition text-xl" onclick="document.getElementById('modalHistory').classList.add('hidden')">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+            <!-- Modal Body -->
+            <div class="p-6 overflow-y-auto bg-slate-50 flex-1">
+                <div id="loadingHistory" class="text-center py-10 hidden">
+                    <i class="fa-solid fa-spinner fa-spin text-3xl text-blue-500 mb-2"></i>
+                    <p class="text-slate-500 text-sm">Memuat data riwayat akademik...</p>
+                </div>
+                <div id="historyContent" class="space-y-4">
+                    <!-- Riwayat Kartu Render dari JS -->
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Elemen Notifikasi Melayang (Toast) -->
     <div id="toastNotification" class="fixed bottom-5 right-5 md:bottom-10 md:right-10 bg-red-600 text-white px-6 py-4 rounded-xl shadow-2xl transform transition-all duration-300 translate-y-32 opacity-0 z-[100] flex items-center pointer-events-none">

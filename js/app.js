@@ -8,8 +8,8 @@ import { CONFIG } from './config.js';
 const state = {
     currentDate: new Date(),
     selectedGuru: "",
-    selectedGuruId: "", // Menambahkan state untuk ID Guru
-    allCPs: [],         // Menyimpan seluruh data CP dari Spreadsheet
+    selectedGuruId: "", 
+    allCPs: [],         
     studentsLoaded: false,
     activeDashboardClass: "",
     chartNilaiInstance: null,
@@ -181,7 +181,7 @@ async function loadElemenCPOptions() {
     }
 }
 
-// DIPERBARUI: Fungsi untuk Merender Dropdown CP Berdasarkan ID Guru
+// Fungsi untuk Merender Dropdown CP Berdasarkan ID Guru
 function renderCPDropdown() {
     let prefix = "";
     const idGuru = String(state.selectedGuruId);
@@ -454,6 +454,7 @@ async function fetchAndRenderDashboardMetrics(className) {
     state.activeDashboardClass = className;
     if (dashboardCache[className]) {
         updateDashboardUI(dashboardCache[className]);
+        loadDashboardStudentList(className); // Menampilkan list siswa dari cache
         return;
     }
 
@@ -466,6 +467,7 @@ async function fetchAndRenderDashboardMetrics(className) {
     if (response.status === 'success') {
         dashboardCache[className] = response.data;
         updateDashboardUI(response.data);
+        loadDashboardStudentList(className); // Menampilkan list siswa setelah fetch data dashboard
     } else {
         showToast("Gagal memuat analitik kelas.", "error");
     }
@@ -555,5 +557,137 @@ function setupEventListeners() {
         }
     });
 }
+
+// ==========================================
+// DRILL-DOWN: DETAIL SISWA & NILAI SUSULAN
+// ==========================================
+async function loadDashboardStudentList(className) {
+    const section = document.getElementById('studentListSection');
+    const tbody = document.getElementById('tbodyDashboardSiswa');
+    
+    document.getElementById('lblDetailKelas').textContent = className;
+    tbody.innerHTML = `<tr><td colspan="3" class="text-center py-6 text-slate-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Memuat daftar siswa...</td></tr>`;
+    if(section) section.classList.remove('hidden');
+
+    const response = await API.getStudentsByClass(className);
+    if (response.status === 'success') {
+        let html = '';
+        response.data.forEach((siswa, index) => {
+            // Escaping tanda kutip untuk nama yang mengandung petik
+            const safeName = siswa.nama_siswa.replace(/'/g, "\\'");
+            html += `
+                <tr class="hover:bg-blue-50 transition">
+                    <td class="p-4 text-center font-medium text-slate-700">${index + 1}</td>
+                    <td class="p-4 font-semibold text-slate-800">${siswa.nama_siswa}</td>
+                    <td class="p-4 text-center">
+                        <button onclick="window.openStudentHistory('${siswa.id_siswa}', '${safeName}', '${className}')" class="px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-bold transition">
+                            Lihat Detail
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html || `<tr><td colspan="3" class="text-center py-4 text-slate-500">Tidak ada data siswa.</td></tr>`;
+    } else {
+        tbody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-red-500">Gagal memuat daftar siswa.</td></tr>`;
+    }
+}
+
+window.openStudentHistory = async function(idSiswa, namaSiswa, kelas) {
+    document.getElementById('modalStudentName').textContent = namaSiswa;
+    document.getElementById('historyContent').innerHTML = '';
+    document.getElementById('loadingHistory').classList.remove('hidden');
+    document.getElementById('modalHistory').classList.remove('hidden');
+
+    const response = await API.getStudentHistory(idSiswa, kelas);
+    document.getElementById('loadingHistory').classList.add('hidden');
+
+    if (response.status === 'success') {
+        if (response.data.length === 0) {
+            document.getElementById('historyContent').innerHTML = `<div class="text-center py-8 text-slate-500 italic">Belum ada riwayat pertemuan untuk kelas ini.</div>`;
+            return;
+        }
+
+        let html = '';
+        response.data.forEach(item => {
+            // LOGIKA INDIKATOR: Kehadiran S/I/A dan nilai kosong
+            const isMissingGrade = ['S', 'I', 'A'].includes(item.kehadiran) && !item.nilai;
+            
+            let badgeWarna = "bg-green-100 text-green-700 border-green-200";
+            if (item.kehadiran === 'S') badgeWarna = "bg-blue-100 text-blue-700 border-blue-200";
+            if (item.kehadiran === 'I') badgeWarna = "bg-yellow-100 text-yellow-700 border-yellow-200";
+            if (item.kehadiran === 'A') badgeWarna = "bg-red-100 text-red-700 border-red-200";
+            if (item.kehadiran === 'PKL') badgeWarna = "bg-purple-100 text-purple-700 border-purple-200";
+
+            html += `
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div class="flex-1">
+                        <div class="text-xs text-slate-500 font-semibold mb-1"><i class="fa-regular fa-calendar mr-1"></i> ${item.tanggal}</div>
+                        <div class="font-bold text-slate-800 text-sm mb-2">${item.judul_materi}</div>
+                        <div class="flex flex-wrap gap-2 text-xs mb-2">
+                            <span class="px-2 py-1 rounded-md font-bold border ${badgeWarna}">Status: ${item.kehadiran}</span>
+                            ${item.nilai ? `<span class="px-2 py-1 rounded-md font-bold bg-slate-100 text-slate-700 border border-slate-200"><i class="fa-solid fa-star text-yellow-500 mr-1"></i> Nilai: ${item.nilai}</span>` : ''}
+                        </div>
+                        ${item.catatan ? `<div class="text-xs text-slate-600 bg-slate-50 p-2 rounded border border-slate-100 break-words"><i class="fa-solid fa-note-sticky mr-1 text-slate-400"></i> ${item.catatan}</div>` : ''}
+                    </div>
+                    
+                    ${isMissingGrade ? `
+                        <div class="bg-red-50 p-3 rounded-lg border border-red-100 flex flex-col shrink-0 w-full md:w-64">
+                            <span class="text-[11px] font-bold text-red-600 mb-2 flex items-center"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Tugas Belum Masuk</span>
+                            <div class="flex gap-2">
+                                <input type="number" id="susulan_${item.id_agenda}" placeholder="Nilai" class="w-full text-sm border-slate-300 rounded-md shadow-sm p-1.5 focus:ring-blue-500 outline-none border">
+                                <button onclick="window.saveLateGrade(event, '${item.id_agenda}', '${idSiswa}', '${item.tanggal}', '${namaSiswa.replace(/'/g, "\\'")}', '${kelas}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-md transition shadow-sm">
+                                    Simpan
+                                </button>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        });
+        document.getElementById('historyContent').innerHTML = html;
+    } else {
+        document.getElementById('historyContent').innerHTML = `<div class="text-center py-8 text-red-500">Gagal memuat riwayat.</div>`;
+    }
+};
+
+window.saveLateGrade = async function(event, idAgenda, idSiswa, tanggal, namaSiswa, kelas) {
+    const inputVal = document.getElementById(`susulan_${idAgenda}`).value;
+    if (!inputVal || inputVal < 0 || inputVal > 100) {
+        showToast("Masukkan nilai susulan 0-100!", "error");
+        return;
+    }
+
+    const btn = event.currentTarget;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`;
+    btn.disabled = true;
+
+    const response = await API.updateLateGrade({
+        id_agenda: idAgenda,
+        id_siswa: idSiswa,
+        nilai: inputVal,
+        tanggal_agenda: tanggal
+    });
+    
+    if (response.status === 'success') {
+        showToast("Nilai susulan berhasil disimpan!", "success");
+        
+        // Hapus cache kelas ini agar dashboard ter-refresh dengan nilai yang baru
+        delete dashboardCache[kelas];
+        
+        // Render ulang tabel history siswa di dalam modal
+        window.openStudentHistory(idSiswa, namaSiswa, kelas); 
+        
+        // Render ulang metrik rata-rata nilai kelas di dashboard
+        if (typeof fetchAndRenderDashboardMetrics === 'function') {
+            fetchAndRenderDashboardMetrics(kelas); 
+        }
+    } else {
+        showToast("Gagal menyimpan: " + response.message, "error");
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+};
 
 document.addEventListener('DOMContentLoaded', init);
