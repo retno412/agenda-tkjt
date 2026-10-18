@@ -1,0 +1,259 @@
+/* ==========================================================================
+   STYLE KUSTOM: AGENDA MENGAJAR TKJT AMI DELTAMAS
+   ========================================================================== */
+
+/* 1. Import Font Modern (Plus Jakarta Sans) agar senada dengan web utama */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+/* 2. CSS Variables untuk Tema Terang (Berdasarkan referensi gambar Light Mode) */
+:root {
+    /* Tipografi */
+    --font-primary: 'Plus Jakarta Sans', sans-serif;
+    
+    /* Warna Latar Belakang & Grid */
+    --bg-body: #ffffff; /* Latar putih bersih */
+    --bg-grid-line: rgba(37, 99, 235, 0.07); /* Garis grid biru muda khas blueprint */
+    
+    /* Warna Komponen (Card, Navbar) */
+    --bg-surface: #ffffff;
+    --bg-surface-hover: #f8fafc;
+    --border-color: #e2e8f0;
+    
+    /* Warna Teks */
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    
+    /* Warna Aksen (Tombol & Highlight) */
+    --accent-blue: #1d4ed8; /* Biru terang khas tombol login */
+    --accent-blue-hover: #1e3a8a;
+    --accent-glow: rgba(29, 78, 216, 0.3);
+    
+    /* Warna Status Kehadiran */
+    --color-hadir: #16a34a;
+    --color-sakit: #2563eb;
+    --color-izin: #d97706;
+    --color-alpha: #dc2626;
+}
+
+/* 3. CSS Variables untuk Tema Gelap (Berdasarkan referensi gambar Dark Mode) */
+body.dark-theme {
+    /* Warna Latar Belakang & Grid */
+    --bg-body: #030712; /* Biru dongker sangat gelap / nyaris hitam */
+    --bg-grid-line: rgba(255, 255, 255, 0.04); /* Garis grid putih sangat tipis */
+    
+    /* Warna Komponen (Card, Navbar) */
+    --bg-surface: #0f172a; /* Biru slate gelap untuk card form */
+    --bg-surface-hover: #1e293b;
+    --border-color: #334155;
+    
+    /* Warna Teks */
+    --text-main: #f8fafc; /* Putih terang untuk judul */
+    --text-muted: #94a3b8;
+    
+    /* Warna Aksen (Tombol & Highlight) */
+    --accent-blue: #2563eb; /* Biru terang agar kontras di latar gelap */
+    --accent-blue-hover: #3b82f6;
+    --accent-glow: rgba(37, 99, 235, 0.5);
+}
+
+/* ==========================================================================
+   PENGATURAN DASAR & BACKGROUND GRID
+   ========================================================================== */
+
+body {
+    font-family: var(--font-primary);
+    background-color: var(--bg-body);
+    color: var(--text-main);
+    
+    /* Membuat pola Grid khas seperti di gambar referensi */
+    background-image: 
+        linear-gradient(var(--bg-grid-line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--bg-grid-line) 1px, transparent 1px);
+    background-size: 40px 40px; /* Ukuran kotak grid */
+    background-position: center top;
+    
+    /* Transisi halus saat berganti tema */
+    transition: background-color 0.4s ease, color 0.4s ease, background-image 0.4s ease;
+}
+
+/* Overrides untuk elemen HTML agar mengikuti CSS Variables kita (Bypass Tailwind) */
+.bg-white, .bg-slate-50 {
+    background-color: var(--bg-surface) !important;
+}
+.text-slate-800, .text-slate-700 {
+    color: var(--text-main) !important;
+}
+.text-slate-500, .text-slate-600 {
+    color: var(--text-muted) !important;
+}
+.border-slate-200, .border-slate-300 {
+    border-color: var(--border-color) !important;
+}
+.bg-slate-100 {
+    background-color: var(--bg-surface-hover) !important;
+}
+
+/* Styling Khusus Input Fields agar menyesuaikan Dark/Light Mode */
+input[type="text"], 
+input[type="number"], 
+input[type="date"], 
+textarea, 
+select {
+    background-color: var(--bg-body);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+}
+
+input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--accent-blue) !important;
+    box-shadow: 0 0 0 3px var(--accent-glow) !important;
+}
+
+/* ==========================================================================
+   UI KOMPONEN KHUSUS
+   ========================================================================== */
+
+/* Navbar Style (Mengikuti gaya header referensi) */
+nav {
+    background-color: var(--bg-surface) !important;
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+}
+
+nav h1 {
+    color: var(--text-main) !important;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+}
+
+/* Tombol Primary (Simpan / Login) */
+.btn-primary, #btnSimpan, nav button {
+    background-color: var(--accent-blue) !important;
+    color: #ffffff !important;
+    border: none;
+    border-radius: 9999px; /* Gaya pil membulat (rounded-full) */
+    font-weight: 600;
+    box-shadow: 0 4px 14px 0 var(--accent-glow);
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover, #btnSimpan:hover, nav button:hover {
+    background-color: var(--accent-blue-hover) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px 0 var(--accent-glow);
+}
+
+/* Sembunyikan scrollbar untuk container yang bisa di-scroll horizontal */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* ==========================================================================
+   KUSTOMISASI RADIO BUTTON KEHADIRAN (H/S/I/A)
+   ========================================================================== */
+.radio-kehadiran {
+    display: none;
+}
+
+/* Sesuaikan ukuran kotak agar lebih mudah di-tap di mobile */
+.label-kehadiran {
+    display: inline-flex; /* Ubah ke inline-flex agar tulisan PKL bisa di tengah */
+    align-items: center;
+    justify-content: center;
+    width: 38px;  /* Sedikit diperbesar dari 34px untuk target sentuh mobile */
+    height: 38px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-body);
+    color: var(--text-muted);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ... (Biarkan kode State Aktif H, S, I, A yang sudah ada) ... */
+
+/* State Aktif: PKL (Praktik Kerja Lapangan) - Warna Ungu */
+:root {
+    --color-pkl: #9333ea; /* Warna ungu untuk variabel terang */
+}
+body.dark-theme {
+    --color-pkl: #a855f7; /* Warna ungu lebih terang untuk mode gelap */
+}
+
+.label-kehadiran:hover {
+    background-color: var(--bg-surface-hover);
+    transform: scale(1.05);
+}
+
+/* State Aktif: Hadir (H) */
+.radio-kehadiran[value="H"]:checked + .label-kehadiran {
+    background-color: rgba(22, 163, 74, 0.1);
+    color: var(--color-hadir);
+    border-color: var(--color-hadir);
+    box-shadow: 0 0 10px rgba(22, 163, 74, 0.2);
+}
+
+/* State Aktif: Sakit (S) */
+.radio-kehadiran[value="S"]:checked + .label-kehadiran {
+    background-color: rgba(37, 99, 235, 0.1);
+    color: var(--color-sakit);
+    border-color: var(--color-sakit);
+    box-shadow: 0 0 10px rgba(37, 99, 235, 0.2);
+}
+
+/* State Aktif: Izin (I) */
+.radio-kehadiran[value="I"]:checked + .label-kehadiran {
+    background-color: rgba(217, 119, 6, 0.1);
+    color: var(--color-izin);
+    border-color: var(--color-izin);
+    box-shadow: 0 0 10px rgba(217, 119, 6, 0.2);
+}
+
+/* State Aktif: Alpha (A) */
+.radio-kehadiran[value="A"]:checked + .label-kehadiran {
+    background-color: rgba(220, 38, 38, 0.1);
+    color: var(--color-alpha);
+    border-color: var(--color-alpha);
+    box-shadow: 0 0 10px rgba(220, 38, 38, 0.2);
+}
+
+/* State Aktif: Berangkat (PKL) */
+.radio-kehadiran[value="PKL"]:checked + .label-kehadiran {
+    background-color: rgba(147, 51, 234, 0.1);
+    color: var(--color-pkl);
+    border-color: var(--color-pkl);
+    box-shadow: 0 0 10px rgba(147, 51, 234, 0.2);
+}
+
+/* ==========================================================================
+   ANIMASI DAN STATE TAMBAHAN
+   ========================================================================== */
+
+/* Efek Hover Baris Tabel */
+tbody tr {
+    transition: background-color 0.2s ease;
+}
+tbody tr:hover {
+    background-color: var(--bg-surface-hover) !important;
+}
+
+/* Animasi Loading pada Tombol Simpan */
+.btn-loading {
+    opacity: 0.7;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+/* Custom Highlight untuk teks */
+::selection {
+    background-color: var(--accent-glow);
+    color: var(--text-main);
+}
