@@ -23,7 +23,6 @@ export const API = {
         }
     },
 
-    // Fungsi untuk menarik data Elemen CP dari Sheet Master_CP
     async getElemenCP() {
         try {
             const response = await fetch(`${CONFIG.GAS_URL}?action=getElemenCP`);
@@ -52,13 +51,8 @@ export const API = {
         try {
             const response = await fetch(CONFIG.GAS_URL, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'text/plain;charset=utf-8',
-                },
-                body: JSON.stringify({
-                    action: 'saveAgendaAndEvaluasi',
-                    payload: payload
-                })
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'saveAgendaAndEvaluasi', payload: payload })
             });
             return await response.json();
         } catch (error) {
@@ -67,7 +61,6 @@ export const API = {
         }
     },
 
-    // ENDPOINT BARU: Menarik riwayat spesifik siswa
     async getStudentHistory(idSiswa, kelas) {
         try {
             const url = `${CONFIG.GAS_URL}?action=getStudentHistory&id_siswa=${encodeURIComponent(idSiswa)}&kelas=${encodeURIComponent(kelas)}`;
@@ -79,18 +72,29 @@ export const API = {
         }
     },
 
-    // ENDPOINT BARU: Menyimpan nilai susulan
-    async updateLateGrade(payload) {
+    // ENDPOINT DIPERBARUI: Simpan Edit Status Kehadiran & Nilai
+    async updateStudentEvaluasi(payload) {
         try {
             const response = await fetch(CONFIG.GAS_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: 'updateLateGrade', payload: payload })
+                body: JSON.stringify({ action: 'updateStudentEvaluasi', payload: payload })
             });
             return await response.json();
         } catch (error) {
-            console.error("Error updating late grade:", error);
-            return { status: 'error', message: 'Gagal menyimpan nilai susulan.' };
+            console.error("Error updating evaluasi:", error);
+            return { status: 'error', message: 'Gagal menyimpan pembaruan.' };
+        }
+    },
+
+    async exportClassData(kelas) {
+        try {
+            const url = `${CONFIG.GAS_URL}?action=exportClassData&kelas=${encodeURIComponent(kelas)}`;
+            const response = await fetch(url);
+            return await response.json();
+        } catch (error) {
+            console.error("Error exporting class data:", error);
+            return { status: 'error', message: 'Gagal mengekspor data kelas.' };
         }
     }
 };

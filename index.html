@@ -126,9 +126,15 @@
 
                 <!-- TABEL DAFTAR SISWA (DRILL-DOWN) -->
                 <div id="studentListSection" class="mt-8 hidden animate-fade-in">
-                    <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
-                        <i class="fa-solid fa-users mr-2 text-blue-600"></i> Detail Siswa: <span id="lblDetailKelas" class="ml-1 text-blue-600"></span>
-                    </h3>
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
+                        <h3 class="text-lg font-bold text-slate-800 flex items-center">
+                            <i class="fa-solid fa-users mr-2 text-blue-600"></i> Detail Siswa: <span id="lblDetailKelas" class="ml-1 text-blue-600"></span>
+                        </h3>
+                        <button id="btnExportExcel" onclick="window.exportClassData()" class="hidden bg-green-600 hover:bg-green-700 text-white text-xs md:text-sm font-bold px-4 py-2 rounded-lg shadow-sm transition flex items-center justify-center">
+                            <i class="fa-solid fa-file-excel mr-2"></i> Export Nilai (.csv)
+                        </button>
+                    </div>
+                    
                     <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                         <div class="overflow-x-auto">
                             <table class="w-full text-left border-collapse">
@@ -209,7 +215,7 @@
                     </div>
                 </div>
 
-                <!-- Form Agenda Kurikulum Merdeka (REVISI SPESIALISASI CP) -->
+                <!-- Form Agenda Kurikulum Merdeka -->
                 <div class="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-slate-200 space-y-5">
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-slate-100 pb-5">
@@ -242,7 +248,7 @@
                         <input type="text" id="judulMateri" placeholder="Cth: Topologi Jaringan Fiber Optik" class="w-full rounded-lg p-2.5 border input-draft">
                     </div>
 
-                    <!-- Elemen CP (Ditarik Langsung dari Spreadsheet Master_CP) -->
+                    <!-- Elemen CP -->
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-1">Elemen Capaian Pembelajaran (CP) <span class="text-red-500">*</span></label>
                         <select id="elemenCPSelect" class="w-full rounded-lg p-2.5 border bg-white focus:ring-2 focus:ring-blue-500 input-draft">
@@ -268,7 +274,7 @@
                             </label>
                         </div>
                         
-                        <!-- Link Modul / Jobsheet (Selalu Tampil untuk Teori & Praktik) -->
+                        <!-- Link Modul / Jobsheet -->
                         <div id="linkModulWrapper" class="mt-3">
                             <label class="block text-xs font-semibold text-slate-500 mb-1">Link Modul / Jobsheet (Opsional)</label>
                             <div class="flex">

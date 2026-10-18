@@ -171,7 +171,6 @@ async function loadTeachers() {
     }
 }
 
-// Mengambil seluruh data CP ke dalam memori aplikasi
 async function loadElemenCPOptions() {
     const response = await API.getElemenCP();
     if (response.status === 'success' && response.data) {
@@ -181,14 +180,13 @@ async function loadElemenCPOptions() {
     }
 }
 
-// Fungsi untuk Merender Dropdown CP Berdasarkan ID Guru
 function renderCPDropdown() {
     let prefix = "";
     const idGuru = String(state.selectedGuruId);
     
-    if (idGuru === "24050667") prefix = "NE";       // Andre Ary Sukma
-    else if (idGuru === "25090887") prefix = "SE";  // Retno Ariyanti Nurningtias
-    else if (idGuru === "26062994") prefix = "DKV"; // Septian Basharah
+    if (idGuru === "24050667") prefix = "NE";       
+    else if (idGuru === "25090887") prefix = "SE";  
+    else if (idGuru === "26062994") prefix = "DKV"; 
 
     let filteredCPs = state.allCPs;
     if (prefix) {
@@ -208,7 +206,7 @@ function selectGuru(id, nama) {
     state.selectedGuru = nama;
     DOM.namaGuruDisplay.textContent = nama;
     
-    renderCPDropdown(); // Saring dan render opsi dropdown CP sesuai guru
+    renderCPDropdown(); 
     restoreDraft(); 
     goToStep(2);
 }
@@ -353,10 +351,12 @@ async function submitData() {
     const payload = {
         tanggal: formatDateForSystem(state.currentDate),
         nama_guru: state.selectedGuru,
+        id_guru: state.selectedGuruId,
         kelas: DOM.kelasSelect.value,
         judul_materi: DOM.judulMateri.value,
         deskripsi_materi: DOM.deskripsiMateri.value,
         semester: DOM.semesterSelect.value,
+        id_cp: DOM.elemenCPSelect.options[DOM.elemenCPSelect.selectedIndex].text.match(/\[(.*?)\]/)?.[1] || "",
         elemen_cp: DOM.elemenCPSelect.value,
         tujuan_pembelajaran: DOM.tujuanPembelajaran.value,
         jenis_sesi: Array.from(DOM.radiosJenisSesi).find(r => r.checked).value,
@@ -454,7 +454,7 @@ async function fetchAndRenderDashboardMetrics(className) {
     state.activeDashboardClass = className;
     if (dashboardCache[className]) {
         updateDashboardUI(dashboardCache[className]);
-        loadDashboardStudentList(className); // Menampilkan list siswa dari cache
+        loadDashboardStudentList(className); 
         return;
     }
 
@@ -467,7 +467,7 @@ async function fetchAndRenderDashboardMetrics(className) {
     if (response.status === 'success') {
         dashboardCache[className] = response.data;
         updateDashboardUI(response.data);
-        loadDashboardStudentList(className); // Menampilkan list siswa setelah fetch data dashboard
+        loadDashboardStudentList(className); 
     } else {
         showToast("Gagal memuat analitik kelas.", "error");
     }
@@ -559,21 +559,22 @@ function setupEventListeners() {
 }
 
 // ==========================================
-// DRILL-DOWN: DETAIL SISWA & NILAI SUSULAN
+// DRILL-DOWN: DETAIL SISWA & EXPORT EXCEL
 // ==========================================
 async function loadDashboardStudentList(className) {
     const section = document.getElementById('studentListSection');
     const tbody = document.getElementById('tbodyDashboardSiswa');
+    const btnExport = document.getElementById('btnExportExcel');
     
     document.getElementById('lblDetailKelas').textContent = className;
     tbody.innerHTML = `<tr><td colspan="3" class="text-center py-6 text-slate-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Memuat daftar siswa...</td></tr>`;
     if(section) section.classList.remove('hidden');
+    if(btnExport) btnExport.classList.add('hidden');
 
     const response = await API.getStudentsByClass(className);
     if (response.status === 'success') {
         let html = '';
         response.data.forEach((siswa, index) => {
-            // Escaping tanda kutip untuk nama yang mengandung petik
             const safeName = siswa.nama_siswa.replace(/'/g, "\\'");
             html += `
                 <tr class="hover:bg-blue-50 transition">
@@ -588,6 +589,11 @@ async function loadDashboardStudentList(className) {
             `;
         });
         tbody.innerHTML = html || `<tr><td colspan="3" class="text-center py-4 text-slate-500">Tidak ada data siswa.</td></tr>`;
+        
+        if (response.data.length > 0 && btnExport) {
+            btnExport.classList.remove('hidden');
+            btnExport.setAttribute('data-kelas', className);
+        }
     } else {
         tbody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-red-500">Gagal memuat daftar siswa.</td></tr>`;
     }
@@ -610,8 +616,13 @@ window.openStudentHistory = async function(idSiswa, namaSiswa, kelas) {
 
         let html = '';
         response.data.forEach(item => {
-            // LOGIKA INDIKATOR: Kehadiran S/I/A dan nilai kosong
-            const isMissingGrade = ['S', 'I', 'A'].includes(item.kehadiran) && !item.nilai;
+            let formattedDate = item.tanggal;
+            try {
+                const d = new Date(item.tanggal);
+                if(!isNaN(d.getTime())) {
+                    formattedDate = d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+                }
+            } catch(e) {}
             
             let badgeWarna = "bg-green-100 text-green-700 border-green-200";
             if (item.kehadiran === 'S') badgeWarna = "bg-blue-100 text-blue-700 border-blue-200";
@@ -619,29 +630,38 @@ window.openStudentHistory = async function(idSiswa, namaSiswa, kelas) {
             if (item.kehadiran === 'A') badgeWarna = "bg-red-100 text-red-700 border-red-200";
             if (item.kehadiran === 'PKL') badgeWarna = "bg-purple-100 text-purple-700 border-purple-200";
 
+            // Dropdown Opsi Status Kehadiran (Auto Selected sesuai status yang ada di database)
+            const statusOptions = ['H', 'S', 'I', 'A', 'PKL'].map(opt => 
+                `<option value="${opt}" ${item.kehadiran === opt ? 'selected' : ''}>${opt}</option>`
+            ).join('');
+
+            // Render Card Historis (Selalu tampilkan form Edit)
             html += `
-                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between gap-4">
                     <div class="flex-1">
-                        <div class="text-xs text-slate-500 font-semibold mb-1"><i class="fa-regular fa-calendar mr-1"></i> ${item.tanggal}</div>
+                        <div class="text-xs text-slate-500 font-semibold mb-1"><i class="fa-regular fa-calendar mr-1"></i> ${formattedDate}</div>
                         <div class="font-bold text-slate-800 text-sm mb-2">${item.judul_materi}</div>
                         <div class="flex flex-wrap gap-2 text-xs mb-2">
-                            <span class="px-2 py-1 rounded-md font-bold border ${badgeWarna}">Status: ${item.kehadiran}</span>
+                            <span class="px-2 py-1 rounded-md font-bold border ${badgeWarna}">Tersimpan: ${item.kehadiran}</span>
                             ${item.nilai ? `<span class="px-2 py-1 rounded-md font-bold bg-slate-100 text-slate-700 border border-slate-200"><i class="fa-solid fa-star text-yellow-500 mr-1"></i> Nilai: ${item.nilai}</span>` : ''}
                         </div>
                         ${item.catatan ? `<div class="text-xs text-slate-600 bg-slate-50 p-2 rounded border border-slate-100 break-words"><i class="fa-solid fa-note-sticky mr-1 text-slate-400"></i> ${item.catatan}</div>` : ''}
                     </div>
                     
-                    ${isMissingGrade ? `
-                        <div class="bg-red-50 p-3 rounded-lg border border-red-100 flex flex-col shrink-0 w-full md:w-64">
-                            <span class="text-[11px] font-bold text-red-600 mb-2 flex items-center"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Tugas Belum Masuk</span>
+                    <div class="bg-blue-50 p-3 rounded-lg border border-blue-100 flex flex-col shrink-0 w-full md:w-64">
+                        <span class="text-[11px] font-bold text-blue-700 mb-2 flex items-center"><i class="fa-solid fa-pen-to-square mr-1"></i> Edit Evaluasi & Nilai</span>
+                        <div class="flex flex-col gap-2">
+                            <select id="status_${item.id_agenda}" class="w-full text-sm border-slate-300 rounded-md shadow-sm p-1.5 focus:ring-blue-500 outline-none border bg-white font-medium text-slate-700">
+                                ${statusOptions}
+                            </select>
                             <div class="flex gap-2">
-                                <input type="number" id="susulan_${item.id_agenda}" placeholder="Nilai" class="w-full text-sm border-slate-300 rounded-md shadow-sm p-1.5 focus:ring-blue-500 outline-none border">
-                                <button onclick="window.saveLateGrade(event, '${item.id_agenda}', '${idSiswa}', '${item.tanggal}', '${namaSiswa.replace(/'/g, "\\'")}', '${kelas}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-md transition shadow-sm">
+                                <input type="number" id="susulan_${item.id_agenda}" placeholder="Nilai (0-100)" value="${item.nilai || ''}" class="w-full text-sm border-slate-300 rounded-md shadow-sm p-1.5 focus:ring-blue-500 outline-none border">
+                                <button onclick="window.saveEvaluasiDetail(event, '${item.id_agenda}', '${idSiswa}', '${item.tanggal}', '${namaSiswa.replace(/'/g, "\\'")}', '${kelas}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-md transition shadow-sm">
                                     Simpan
                                 </button>
                             </div>
                         </div>
-                    ` : ''}
+                    </div>
                 </div>
             `;
         });
@@ -651,35 +671,27 @@ window.openStudentHistory = async function(idSiswa, namaSiswa, kelas) {
     }
 };
 
-window.saveLateGrade = async function(event, idAgenda, idSiswa, tanggal, namaSiswa, kelas) {
+window.saveEvaluasiDetail = async function(event, idAgenda, idSiswa, tanggal, namaSiswa, kelas) {
     const inputVal = document.getElementById(`susulan_${idAgenda}`).value;
-    if (!inputVal || inputVal < 0 || inputVal > 100) {
-        showToast("Masukkan nilai susulan 0-100!", "error");
-        return;
-    }
+    const statusVal = document.getElementById(`status_${idAgenda}`).value;
 
     const btn = event.currentTarget;
     const originalText = btn.innerHTML;
     btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`;
     btn.disabled = true;
 
-    const response = await API.updateLateGrade({
+    const response = await API.updateStudentEvaluasi({
         id_agenda: idAgenda,
         id_siswa: idSiswa,
+        kehadiran: statusVal,
         nilai: inputVal,
         tanggal_agenda: tanggal
     });
     
     if (response.status === 'success') {
-        showToast("Nilai susulan berhasil disimpan!", "success");
-        
-        // Hapus cache kelas ini agar dashboard ter-refresh dengan nilai yang baru
+        showToast("Pembaruan berhasil disimpan!", "success");
         delete dashboardCache[kelas];
-        
-        // Render ulang tabel history siswa di dalam modal
         window.openStudentHistory(idSiswa, namaSiswa, kelas); 
-        
-        // Render ulang metrik rata-rata nilai kelas di dashboard
         if (typeof fetchAndRenderDashboardMetrics === 'function') {
             fetchAndRenderDashboardMetrics(kelas); 
         }
@@ -688,6 +700,56 @@ window.saveLateGrade = async function(event, idAgenda, idSiswa, tanggal, namaSis
         btn.innerHTML = originalText;
         btn.disabled = false;
     }
+};
+
+window.exportClassData = async function() {
+    const btn = document.getElementById('btnExportExcel');
+    const kelas = btn.getAttribute('data-kelas');
+    
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Menyiapkan...`;
+    btn.disabled = true;
+
+    const response = await API.exportClassData(kelas);
+    
+    if(response.status === 'success') {
+        const data = response.data;
+        if(data.length === 0) {
+            showToast("Belum ada data evaluasi untuk diexport", "error");
+        } else {
+            const headers = ["ID_Siswa", "Nama_Siswa", "Tanggal", "Judul_Materi", "Kehadiran", "Nilai", "Catatan_Khusus"];
+            const csvRows = [];
+            csvRows.push(headers.join(","));
+
+            data.forEach(row => {
+                const values = [
+                    `"${row.id_siswa}"`,
+                    `"${row.nama_siswa}"`,
+                    `"${row.tanggal}"`,
+                    `"${row.judul_materi}"`,
+                    `"${row.kehadiran}"`,
+                    `"${row.nilai || ''}"`,
+                    `"${(row.catatan || '').replace(/"/g, '""')}"` 
+                ];
+                csvRows.push(values.join(","));
+            });
+
+            const csvString = csvRows.join("\n");
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `Rekap_Evaluasi_${kelas.replace(/[^a-zA-Z0-9]/g, '_')}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    } else {
+        showToast("Gagal menarik data export", "error");
+    }
+
+    btn.innerHTML = originalHTML;
+    btn.disabled = false;
 };
 
 document.addEventListener('DOMContentLoaded', init);
