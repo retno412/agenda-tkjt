@@ -8,6 +8,8 @@ import { CONFIG } from './config.js';
 const state = {
     currentDate: new Date(),
     selectedGuru: "",
+    selectedGuruId: "", // Menambahkan state untuk ID Guru
+    allCPs: [],         // Menyimpan seluruh data CP dari Spreadsheet
     studentsLoaded: false,
     activeDashboardClass: "",
     chartNilaiInstance: null,
@@ -79,7 +81,7 @@ async function init() {
     
     await loadTeachers();
     await loadDashboardClasses();
-    await loadElemenCPOptions();
+    await loadElemenCPOptions(); 
 }
 
 function switchMainView(viewName) {
@@ -131,6 +133,7 @@ function goToStep(stepNumber) {
     if (stepNumber === 1) {
         DOM.step1.classList.remove('hidden');
         state.selectedGuru = ""; 
+        state.selectedGuruId = "";
     } else if (stepNumber === 2) {
         DOM.step2.classList.remove('hidden');
         window.scrollTo(0, 0);
@@ -149,7 +152,7 @@ async function loadTeachers() {
         let html = '';
         response.data.forEach(guru => {
             html += `
-                <button type="button" data-nama="${guru.nama_guru}" class="btn-pilih-guru bg-white border border-slate-200 p-5 rounded-xl text-center shadow-sm hover:border-blue-500 hover:shadow-md transition flex flex-col items-center justify-center space-y-3">
+                <button type="button" data-id="${guru.id_guru}" data-nama="${guru.nama_guru}" class="btn-pilih-guru bg-white border border-slate-200 p-5 rounded-xl text-center shadow-sm hover:border-blue-500 hover:shadow-md transition flex flex-col items-center justify-center space-y-3">
                     <div class="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
                         <i class="fa-solid fa-chalkboard-user"></i>
                     </div>
@@ -161,29 +164,51 @@ async function loadTeachers() {
 
         document.querySelectorAll('.btn-pilih-guru').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                selectGuru(e.currentTarget.getAttribute('data-nama'));
+                const el = e.currentTarget;
+                selectGuru(el.getAttribute('data-id'), el.getAttribute('data-nama'));
             });
         });
     }
 }
 
+// Mengambil seluruh data CP ke dalam memori aplikasi
 async function loadElemenCPOptions() {
     const response = await API.getElemenCP();
     if (response.status === 'success' && response.data) {
-        let html = '<option value="">-- Pilih Elemen CP --</option>';
-        response.data.forEach(cp => {
-            html += `<option value="${cp}">${cp}</option>`;
-        });
-        DOM.elemenCPSelect.innerHTML = html;
-        restoreDraft(); 
+        state.allCPs = response.data; 
     } else {
         DOM.elemenCPSelect.innerHTML = '<option value="">Gagal memuat Elemen CP</option>';
     }
 }
 
-function selectGuru(nama) {
+// DIPERBARUI: Fungsi untuk Merender Dropdown CP Berdasarkan ID Guru
+function renderCPDropdown() {
+    let prefix = "";
+    const idGuru = String(state.selectedGuruId);
+    
+    if (idGuru === "24050667") prefix = "NE";       // Andre Ary Sukma
+    else if (idGuru === "25090887") prefix = "SE";  // Retno Ariyanti Nurningtias
+    else if (idGuru === "26062994") prefix = "DKV"; // Septian Basharah
+
+    let filteredCPs = state.allCPs;
+    if (prefix) {
+        filteredCPs = state.allCPs.filter(cp => String(cp.id_cp).startsWith(prefix));
+    }
+
+    let html = '<option value="">-- Pilih Elemen CP --</option>';
+    filteredCPs.forEach(cp => {
+        html += `<option value="${cp.elemen_cp}">[${cp.id_cp}] ${cp.elemen_cp}</option>`;
+    });
+    
+    DOM.elemenCPSelect.innerHTML = html;
+}
+
+function selectGuru(id, nama) {
+    state.selectedGuruId = id;
     state.selectedGuru = nama;
     DOM.namaGuruDisplay.textContent = nama;
+    
+    renderCPDropdown(); // Saring dan render opsi dropdown CP sesuai guru
     restoreDraft(); 
     goToStep(2);
 }
