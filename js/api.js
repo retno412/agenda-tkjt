@@ -12,9 +12,12 @@ export const API = {
         }
     },
 
-    async getStudentsByClass(kelas) {
+    async getStudentsByClass(kelas, produktif = "", spesialisasi = "") {
         try {
-            const url = `${CONFIG.GAS_URL}?action=getStudentsByClass&kelas=${encodeURIComponent(kelas)}`;
+            let url = `${CONFIG.GAS_URL}?action=getStudentsByClass&kelas=${encodeURIComponent(kelas)}`;
+            if (produktif) url += `&produktif=${encodeURIComponent(produktif)}`;
+            if (spesialisasi) url += `&spesialisasi=${encodeURIComponent(spesialisasi)}`;
+            
             const response = await fetch(url);
             return await response.json();
         } catch (error) {
@@ -33,11 +36,12 @@ export const API = {
         }
     },
 
-    async getDashboardData(kelas = '') {
+    async getDashboardData(kelas = '', produktif = '', spesialisasi = '') {
         try {
-            const url = kelas 
-                ? `${CONFIG.GAS_URL}?action=getDashboardData&kelas=${encodeURIComponent(kelas)}`
-                : `${CONFIG.GAS_URL}?action=getDashboardData`;
+            let url = `${CONFIG.GAS_URL}?action=getDashboardData`;
+            if (kelas) url += `&kelas=${encodeURIComponent(kelas)}`;
+            if (produktif) url += `&produktif=${encodeURIComponent(produktif)}`;
+            if (spesialisasi) url += `&spesialisasi=${encodeURIComponent(spesialisasi)}`;
                 
             const response = await fetch(url);
             return await response.json();
@@ -72,7 +76,6 @@ export const API = {
         }
     },
 
-    // ENDPOINT DIPERBARUI: Simpan Edit Status Kehadiran & Nilai
     async updateStudentEvaluasi(payload) {
         try {
             const response = await fetch(CONFIG.GAS_URL, {
@@ -87,9 +90,12 @@ export const API = {
         }
     },
 
-    async exportClassData(kelas) {
+    async exportClassData(kelas, produktif = "", spesialisasi = "") {
         try {
-            const url = `${CONFIG.GAS_URL}?action=exportClassData&kelas=${encodeURIComponent(kelas)}`;
+            let url = `${CONFIG.GAS_URL}?action=exportClassData&kelas=${encodeURIComponent(kelas)}`;
+            if (produktif) url += `&produktif=${encodeURIComponent(produktif)}`;
+            if (spesialisasi) url += `&spesialisasi=${encodeURIComponent(spesialisasi)}`;
+
             const response = await fetch(url);
             return await response.json();
         } catch (error) {

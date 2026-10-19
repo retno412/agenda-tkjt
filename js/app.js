@@ -44,6 +44,8 @@ const DOM = {
     
     kelasSelect: document.getElementById('kelasSelect'),
     semesterSelect: document.getElementById('semesterSelect'),
+    produktifSelect: document.getElementById('produktifSelect'), 
+    spesialisasiSelect: document.getElementById('spesialisasiSelect'), 
     judulMateri: document.getElementById('judulMateri'),
     elemenCPSelect: document.getElementById('elemenCPSelect'),
     tujuanPembelajaran: document.getElementById('tujuanPembelajaran'),
@@ -66,7 +68,12 @@ const DOM = {
     dashboardLoading: document.getElementById('dashboardLoading'),
     metricPertemuan: document.getElementById('metricPertemuan'),
     metricKehadiran: document.getElementById('metricKehadiran'),
-    metricNilai: document.getElementById('metricNilai')
+    metricNilai: document.getElementById('metricNilai'),
+    
+    filterDashboardKelas: document.getElementById('filterDashboardKelas'),
+    filterDashboardProduktif: document.getElementById('filterDashboardProduktif'),
+    filterDashboardSpesialisasi: document.getElementById('filterDashboardSpesialisasi'),
+    btnApplyDashboardFilter: document.getElementById('btnApplyDashboardFilter'),
 };
 
 // ==========================================
@@ -80,8 +87,10 @@ async function init() {
     switchMainView('dashboard'); 
     
     await loadTeachers();
-    await loadDashboardClasses();
-    await loadElemenCPOptions(); 
+    await fetchDashboardClassesOnly(); 
+    
+    // Dipanggil secara asinkron (tidak memblokir aplikasi)
+    loadElemenCPOptions(); 
 }
 
 function switchMainView(viewName) {
@@ -171,12 +180,34 @@ async function loadTeachers() {
     }
 }
 
+// DIPERBARUI: Menggunakan CACHE agar pemuatan instan, lalu perbarui di latar belakang
 async function loadElemenCPOptions() {
-    const response = await API.getElemenCP();
-    if (response.status === 'success' && response.data) {
-        state.allCPs = response.data; 
+    // 1. Coba ambil dari Cache LocalStorage
+    const cachedCP = localStorage.getItem('tkjt_cp_cache');
+    if (cachedCP) {
+        try {
+            state.allCPs = JSON.parse(cachedCP);
+            if (state.selectedGuru) renderCPDropdown(); // Jika user sedang di Form Step 2
+        } catch (e) { console.error("Cache CP Error", e); }
     } else {
-        DOM.elemenCPSelect.innerHTML = '<option value="">Gagal memuat Elemen CP</option>';
+        DOM.elemenCPSelect.innerHTML = '<option value="">Memuat Elemen CP dari server...</option>';
+    }
+
+    // 2. Tarik update terbaru di background tanpa memblokir aplikasi
+    try {
+        const response = await API.getElemenCP();
+        if (response.status === 'success' && response.data) {
+            state.allCPs = response.data; 
+            localStorage.setItem('tkjt_cp_cache', JSON.stringify(response.data));
+            
+            // Perbarui UI jika form sedang terbuka agar selalu up-to-date
+            if (state.selectedGuru) {
+                renderCPDropdown();
+                restoreDraft(); // pastikan CP yang terpilih sebelumnya tidak hilang
+            }
+        }
+    } catch(e) {
+        console.error("Gagal sinkronisasi CP di latar belakang:", e);
     }
 }
 
@@ -224,14 +255,21 @@ async function proceedToStep3() {
     if (!DOM.tujuanPembelajaran.value) return showToast("Tujuan Pembelajaran wajib diisi!");
 
     const kelas = DOM.kelasSelect.value;
-    DOM.labelKelasAktif.textContent = kelas;
+    const prod = DOM.produktifSelect.value;
+    const spec = DOM.spesialisasiSelect.value;
+    
+    let labelText = kelas;
+    if(prod) labelText += ` | Grup ${prod}`;
+    if(spec) labelText += ` | Spesialisasi ${spec}`;
+    
+    DOM.labelKelasAktif.textContent = labelText;
     goToStep(3); 
 
     DOM.tbodySiswa.innerHTML = '';
     DOM.loadingSiswa.classList.remove('hidden');
     DOM.evaluasiContainer.classList.add('hidden');
 
-    const response = await API.getStudentsByClass(kelas);
+    const response = await API.getStudentsByClass(kelas, prod, spec);
     DOM.loadingSiswa.classList.add('hidden');
     DOM.evaluasiContainer.classList.remove('hidden');
 
@@ -285,6 +323,8 @@ function saveDraft() {
     const draft = {
         kelas: DOM.kelasSelect.value,
         semester: DOM.semesterSelect.value,
+        produktif: DOM.produktifSelect.value, 
+        spesialisasi: DOM.spesialisasiSelect.value, 
         judul: DOM.judulMateri.value,
         cp: DOM.elemenCPSelect.value,
         tp: DOM.tujuanPembelajaran.value,
@@ -302,6 +342,8 @@ function restoreDraft() {
         const draft = JSON.parse(draftStr);
         DOM.kelasSelect.value = draft.kelas || "";
         DOM.semesterSelect.value = draft.semester || "1";
+        DOM.produktifSelect.value = draft.produktif || ""; 
+        DOM.spesialisasiSelect.value = draft.spesialisasi || ""; 
         DOM.judulMateri.value = draft.judul || "";
         DOM.elemenCPSelect.value = draft.cp || ""; 
         DOM.tujuanPembelajaran.value = draft.tp || "";
@@ -352,7 +394,7 @@ async function submitData() {
         tanggal: formatDateForSystem(state.currentDate),
         nama_guru: state.selectedGuru,
         id_guru: state.selectedGuruId,
-        kelas: DOM.kelasSelect.value,
+        kelas: DOM.kelasSelect.value, 
         judul_materi: DOM.judulMateri.value,
         deskripsi_materi: DOM.deskripsiMateri.value,
         semester: DOM.semesterSelect.value,
@@ -382,92 +424,53 @@ async function submitData() {
     }
 }
 
-async function loadDashboardClasses() {
-    const response = await API.getDashboardData(); 
-    if (response.status === 'success' && response.data.classes) {
-        const classes = response.data.classes;
-        
-        if (classes.length === 0) {
-            DOM.dashboardClassButtons.innerHTML = `<p class="text-sm text-slate-400 italic">Belum ada data kelas yang tercatat.</p>`;
-            DOM.dashboardClassSelectMobile.innerHTML = `<option value="">Belum ada kelas</option>`;
-            return;
-        }
-
-        let htmlButtons = '';
-        classes.forEach(cls => {
-            htmlButtons += `
-                <button type="button" data-kelas="${cls}" class="btn-dashboard-kelas px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 font-semibold text-sm shadow-sm hover:border-blue-500 hover:text-blue-600 transition">
-                    ${cls}
-                </button>
-            `;
-        });
-        DOM.dashboardClassButtons.innerHTML = htmlButtons;
-
-        let htmlOptions = `<option value="">-- Pilih Kelas --</option>`;
-        classes.forEach(cls => {
-            htmlOptions += `<option value="${cls}">${cls}</option>`;
-        });
-        DOM.dashboardClassSelectMobile.innerHTML = htmlOptions;
-
-        document.querySelectorAll('.btn-dashboard-kelas').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const targetKelas = e.currentTarget.getAttribute('data-kelas');
-                DOM.dashboardClassSelectMobile.value = targetKelas;
-
-                document.querySelectorAll('.btn-dashboard-kelas').forEach(b => {
-                    b.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
-                    b.classList.add('bg-white', 'text-slate-700');
-                });
-                e.currentTarget.classList.remove('bg-white', 'text-slate-700');
-                e.currentTarget.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
-
-                fetchAndRenderDashboardMetrics(targetKelas);
-            });
-        });
-
-        DOM.dashboardClassSelectMobile.addEventListener('change', (e) => {
-            const targetKelas = e.target.value;
-            if (!targetKelas) return;
-
-            document.querySelectorAll('.btn-dashboard-kelas').forEach(b => {
-                if (b.getAttribute('data-kelas') === targetKelas) {
-                    b.classList.remove('bg-white', 'text-slate-700');
-                    b.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
-                } else {
-                    b.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
-                    b.classList.add('bg-white', 'text-slate-700');
-                }
-            });
-
-            fetchAndRenderDashboardMetrics(targetKelas);
-        });
-
-        if (classes.length > 0) {
-            document.querySelector('.btn-dashboard-kelas').click();
-        }
-    }
-}
+// ==========================================
+// DASHBOARD & EXPORT DENGAN FILTER 3 TINGKAT
+// ==========================================
 
 const dashboardCache = {};
 
-async function fetchAndRenderDashboardMetrics(className) {
-    state.activeDashboardClass = className;
-    if (dashboardCache[className]) {
-        updateDashboardUI(dashboardCache[className]);
-        loadDashboardStudentList(className); 
+async function fetchDashboardClassesOnly() {
+    const response = await API.getDashboardData(); 
+    if (response.status === 'success' && response.data.classes) {
+        const classes = response.data.classes;
+        let htmlOptions = `<option value="">-- Pilih Kelas Terlebih Dahulu --</option>`;
+        classes.forEach(cls => {
+            htmlOptions += `<option value="${cls}">${cls}</option>`;
+        });
+        DOM.filterDashboardKelas.innerHTML = htmlOptions;
+    }
+}
+
+window.applyDashboardFilter = async function() {
+    const kelas = DOM.filterDashboardKelas.value;
+    const prod = DOM.filterDashboardProduktif.value;
+    const spec = DOM.filterDashboardSpesialisasi.value;
+
+    if (!kelas) {
+        showToast("Filter Kelas wajib dipilih!", "error");
+        return;
+    }
+
+    const cacheKey = `${kelas}_${prod}_${spec}`;
+
+    if (dashboardCache[cacheKey]) {
+        updateDashboardUI(dashboardCache[cacheKey]);
+        loadDashboardStudentList(kelas, prod, spec); 
         return;
     }
 
     DOM.dashboardContent.classList.add('hidden');
     DOM.dashboardLoading.classList.remove('hidden');
 
-    const response = await API.getDashboardData(className);
+    const response = await API.getDashboardData(kelas, prod, spec);
+    
     DOM.dashboardLoading.classList.add('hidden');
 
     if (response.status === 'success') {
-        dashboardCache[className] = response.data;
+        dashboardCache[cacheKey] = response.data;
         updateDashboardUI(response.data);
-        loadDashboardStudentList(className); 
+        loadDashboardStudentList(kelas, prod, spec); 
     } else {
         showToast("Gagal memuat analitik kelas.", "error");
     }
@@ -534,6 +537,8 @@ function setupEventListeners() {
         switchMainView('dashboard');
     });
 
+    DOM.btnApplyDashboardFilter.addEventListener('click', window.applyDashboardFilter);
+
     DOM.btnGantiGuru.addEventListener('click', () => goToStep(1));
     DOM.btnLanjutEvaluasi.addEventListener('click', proceedToStep3);
     DOM.btnKembaliStep2.addEventListener('click', () => goToStep(2));
@@ -545,8 +550,8 @@ function setupEventListeners() {
     DOM.inputDate.addEventListener('change', (e) => { state.currentDate = new Date(e.target.value); updateDateDisplay(); });
     
     const inputsToSave = [
-        DOM.kelasSelect, DOM.semesterSelect, DOM.judulMateri, 
-        DOM.elemenCPSelect, DOM.tujuanPembelajaran, 
+        DOM.kelasSelect, DOM.semesterSelect, DOM.produktifSelect, DOM.spesialisasiSelect,
+        DOM.judulMateri, DOM.elemenCPSelect, DOM.tujuanPembelajaran, 
         DOM.deskripsiMateri, DOM.linkModul
     ];
     
@@ -558,20 +563,21 @@ function setupEventListeners() {
     });
 }
 
-// ==========================================
-// DRILL-DOWN: DETAIL SISWA & EXPORT EXCEL
-// ==========================================
-async function loadDashboardStudentList(className) {
+async function loadDashboardStudentList(kelas, prod, spec) {
     const section = document.getElementById('studentListSection');
     const tbody = document.getElementById('tbodyDashboardSiswa');
     const btnExport = document.getElementById('btnExportExcel');
     
-    document.getElementById('lblDetailKelas').textContent = className;
+    let labelText = kelas;
+    if(prod) labelText += ` | Grup ${prod}`;
+    if(spec) labelText += ` | Spesialisasi ${spec}`;
+    document.getElementById('lblDetailKelas').textContent = labelText;
+    
     tbody.innerHTML = `<tr><td colspan="3" class="text-center py-6 text-slate-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Memuat daftar siswa...</td></tr>`;
     if(section) section.classList.remove('hidden');
     if(btnExport) btnExport.classList.add('hidden');
 
-    const response = await API.getStudentsByClass(className);
+    const response = await API.getStudentsByClass(kelas, prod, spec);
     if (response.status === 'success') {
         let html = '';
         response.data.forEach((siswa, index) => {
@@ -581,25 +587,27 @@ async function loadDashboardStudentList(className) {
                     <td class="p-4 text-center font-medium text-slate-700">${index + 1}</td>
                     <td class="p-4 font-semibold text-slate-800">${siswa.nama_siswa}</td>
                     <td class="p-4 text-center">
-                        <button onclick="window.openStudentHistory('${siswa.id_siswa}', '${safeName}', '${className}')" class="px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-bold transition">
+                        <button onclick="window.openStudentHistory('${siswa.id_siswa}', '${safeName}', '${kelas}', '${prod}', '${spec}')" class="px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-bold transition">
                             Lihat Detail
                         </button>
                     </td>
                 </tr>
             `;
         });
-        tbody.innerHTML = html || `<tr><td colspan="3" class="text-center py-4 text-slate-500">Tidak ada data siswa.</td></tr>`;
+        tbody.innerHTML = html || `<tr><td colspan="3" class="text-center py-4 text-slate-500">Tidak ada data siswa untuk filter ini.</td></tr>`;
         
         if (response.data.length > 0 && btnExport) {
             btnExport.classList.remove('hidden');
-            btnExport.setAttribute('data-kelas', className);
+            btnExport.setAttribute('data-kelas', kelas);
+            btnExport.setAttribute('data-prod', prod);
+            btnExport.setAttribute('data-spec', spec);
         }
     } else {
         tbody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-red-500">Gagal memuat daftar siswa.</td></tr>`;
     }
 }
 
-window.openStudentHistory = async function(idSiswa, namaSiswa, kelas) {
+window.openStudentHistory = async function(idSiswa, namaSiswa, kelas, prod, spec) {
     document.getElementById('modalStudentName').textContent = namaSiswa;
     document.getElementById('historyContent').innerHTML = '';
     document.getElementById('loadingHistory').classList.remove('hidden');
@@ -630,12 +638,10 @@ window.openStudentHistory = async function(idSiswa, namaSiswa, kelas) {
             if (item.kehadiran === 'A') badgeWarna = "bg-red-100 text-red-700 border-red-200";
             if (item.kehadiran === 'PKL') badgeWarna = "bg-purple-100 text-purple-700 border-purple-200";
 
-            // Dropdown Opsi Status Kehadiran (Auto Selected sesuai status yang ada di database)
             const statusOptions = ['H', 'S', 'I', 'A', 'PKL'].map(opt => 
                 `<option value="${opt}" ${item.kehadiran === opt ? 'selected' : ''}>${opt}</option>`
             ).join('');
 
-            // Render Card Historis (Selalu tampilkan form Edit)
             html += `
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between gap-4">
                     <div class="flex-1">
@@ -656,7 +662,7 @@ window.openStudentHistory = async function(idSiswa, namaSiswa, kelas) {
                             </select>
                             <div class="flex gap-2">
                                 <input type="number" id="susulan_${item.id_agenda}" placeholder="Nilai (0-100)" value="${item.nilai || ''}" class="w-full text-sm border-slate-300 rounded-md shadow-sm p-1.5 focus:ring-blue-500 outline-none border">
-                                <button onclick="window.saveEvaluasiDetail(event, '${item.id_agenda}', '${idSiswa}', '${item.tanggal}', '${namaSiswa.replace(/'/g, "\\'")}', '${kelas}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-md transition shadow-sm">
+                                <button onclick="window.saveEvaluasiDetail(event, '${item.id_agenda}', '${idSiswa}', '${item.tanggal}', '${namaSiswa.replace(/'/g, "\\'")}', '${kelas}', '${prod}', '${spec}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-md transition shadow-sm">
                                     Simpan
                                 </button>
                             </div>
@@ -671,7 +677,7 @@ window.openStudentHistory = async function(idSiswa, namaSiswa, kelas) {
     }
 };
 
-window.saveEvaluasiDetail = async function(event, idAgenda, idSiswa, tanggal, namaSiswa, kelas) {
+window.saveEvaluasiDetail = async function(event, idAgenda, idSiswa, tanggal, namaSiswa, kelas, prod, spec) {
     const inputVal = document.getElementById(`susulan_${idAgenda}`).value;
     const statusVal = document.getElementById(`status_${idAgenda}`).value;
 
@@ -690,11 +696,12 @@ window.saveEvaluasiDetail = async function(event, idAgenda, idSiswa, tanggal, na
     
     if (response.status === 'success') {
         showToast("Pembaruan berhasil disimpan!", "success");
-        delete dashboardCache[kelas];
-        window.openStudentHistory(idSiswa, namaSiswa, kelas); 
-        if (typeof fetchAndRenderDashboardMetrics === 'function') {
-            fetchAndRenderDashboardMetrics(kelas); 
-        }
+        
+        const cacheKey = `${kelas}_${prod}_${spec}`;
+        delete dashboardCache[cacheKey];
+        
+        window.openStudentHistory(idSiswa, namaSiswa, kelas, prod, spec); 
+        window.applyDashboardFilter(); 
     } else {
         showToast("Gagal menyimpan: " + response.message, "error");
         btn.innerHTML = originalText;
@@ -705,12 +712,14 @@ window.saveEvaluasiDetail = async function(event, idAgenda, idSiswa, tanggal, na
 window.exportClassData = async function() {
     const btn = document.getElementById('btnExportExcel');
     const kelas = btn.getAttribute('data-kelas');
+    const prod = btn.getAttribute('data-prod') || "";
+    const spec = btn.getAttribute('data-spec') || "";
     
     const originalHTML = btn.innerHTML;
     btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Menyiapkan...`;
     btn.disabled = true;
 
-    const response = await API.exportClassData(kelas);
+    const response = await API.exportClassData(kelas, prod, spec);
     
     if(response.status === 'success') {
         const data = response.data;
